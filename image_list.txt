@@ -1,0 +1,3 @@
+/home/nbandaru1/train_ten_class_orig/000000001374.jpg
+/home/nbandaru1/train_ten_class_orig/000000004322.jpg
+/home/nbandaru1/train_ten_class_orig/000000007623.jpg
