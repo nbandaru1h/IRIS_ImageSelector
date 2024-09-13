@@ -32,3 +32,4 @@ Upcoming Updates:
 2. Ability to view (only) yolo bounding boxes in the image. User can choose to not view bounding boxes as well.
 ------------------------------------------------------------------------------------------------------------------------------------------------------
 
+AUTHOR: NIRALI BANDARU
