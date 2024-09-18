@@ -15,6 +15,8 @@ General flow of application:
 
 Instructions:
 ```
+git clone https://github.com/nbandaru1h/IRIS_ImageSelector.git
+
 mkdir build && cd build
 
 cmake ..
@@ -24,6 +26,8 @@ make   # Linux
 cmake --build .   # Windows
 
 ./IRIS_ImageSelector   # Linux
+
+git checkout master # Linux
 
 IRIS_ImageSelector.exe  # Windows
 ```
