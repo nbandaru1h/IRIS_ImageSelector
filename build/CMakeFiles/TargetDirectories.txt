@@ -1,8 +1,0 @@
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/IRIS_ImageSelector.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/edit_cache.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/rebuild_cache.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/list_install_components.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/install.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/install/local.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/install/strip.dir
-/home/nbandaru1/ai/ann/projects/applications/IRIS_ImageSelector/build/CMakeFiles/IRIS_ImageSelector_autogen.dir

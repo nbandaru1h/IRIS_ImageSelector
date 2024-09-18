@@ -8,20 +8,10 @@
 #include <QResizeEvent>
 #include <QMessageBox>
 #include <QDateTime>
-
-#include "mainwindow.h"
-
-#include <QFileDialog>
-#include <QImage>
-#include <QPixmap>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QResizeEvent>
-#include <QMessageBox>
-#include <QDateTime>
-
+#include <QPainter>
+#include <QFile>
+#include <QTextStream>
 #include <QLabel>
-#include <QVBoxLayout>
 
 // Definition of the styleButton function
 void MainWindow::styleButton(QPushButton *button) {
@@ -49,17 +39,49 @@ void MainWindow::styleButton(QPushButton *button) {
 void MainWindow::setMainWindowStyle() {
     this->setStyleSheet(
         "background-color: #FAFAFA;" // Change to your preferred background color
+        "color: black"
         );
 }
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), currentImageIndex(0), savedFilePath("") {
-    // Create the title label
-    QLabel *titleLabel = new QLabel("IRIS Image Selector", this);
-    titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #003366; }"); // Professional font color and size
+    : QMainWindow(parent), currentImageIndex(0), savedFilePath(""), showYoloBoundingBoxes(false)
+{
+    // Initialize classColors
+    classColors[0] = QColor("#FF6347");  // Tomato
+    classColors[1] = QColor("#9400D3");  // Dark Violet
+    classColors[2] = QColor("#32CD32");  // Lime Green
+    classColors[3] = QColor("#FFD700");  // Gold
+    classColors[4] = QColor("#FF4500");  // Orange Red
+    classColors[5] = QColor("#00CED1");  // Dark Turquoise
+    classColors[6] = QColor("#A0522D"); // Sienna
+    classColors[7] = QColor("#FF1493");  // Deep Pink
+    classColors[8] = QColor("#4682b4");  // Royal Blue
+    classColors[9] = QColor("#2E8B57"); // Sea Green
+    classColors[10] = QColor("#DC143C"); // Crimson
+    classColors[11] = QColor("#8A2BE2"); // Blue Violet
+    classColors[12] = QColor("#7FFF00"); // Chartreuse
+    classColors[13] = QColor("#D2691E"); // Chocolate
+    classColors[14] = QColor("#FFB6C1"); // Light Pink
+    classColors[15] = QColor("#800080"); // Purple
+    classColors[16] = QColor("#C71585"); // Medium Violet Red
+    classColors[17] = QColor("#FF69B4");  // Hot Pink
+    classColors[18] = QColor("#5F9EA0"); // Cadet Blue
+    classColors[19] = QColor("#FFDAB9"); // Peach Puff
+    classColors[20] = QColor("#FF8C00"); // Dark Orange
+    classColors[21] = QColor("#20B2AA"); // Light Sea Green
+    classColors[22] = QColor("#B22222"); // Firebrick
+    classColors[23] = QColor("#4682B4");  // Steel Blue
+    classColors[24] = QColor("#008080"); // Teal
 
-    // Setup UI
+
+    // Initialize the current image and annotations
+    currentImage = QImage();
+    currentAnnotations.clear();
+
+    // Create the title label
+    titleLabel = new QLabel("IRIS Image Selector", this);
+    titleLabel->setAlignment(Qt::AlignCenter);
+    titleLabel->setStyleSheet("QLabel { font-size: 24px; font-weight: bold; color: #003366; }");
 
     // Setup UI
     setMainWindowStyle(); // Set main window background color
@@ -85,6 +107,39 @@ MainWindow::MainWindow(QWidget *parent)
     clearButton = new QPushButton("Clear List", this);
     deleteButton = new QPushButton("Delete", this);
     moveButton = new QPushButton("Move", this);
+    copyButton = new QPushButton("Copy", this);
+    toggleYoloButton = new QPushButton("Toggle YOLO Bounding Boxes", this);
+    loadNamesButton = new QPushButton("Load Class Names", this);
+
+    // List Group
+    QGroupBox *listGroupBox = new QGroupBox("List", this);
+    QVBoxLayout *listLayout = new QVBoxLayout();
+    listLayout->addWidget(addButton);
+    listLayout->addWidget(removeButton);
+    listLayout->addWidget(saveButton);
+    listLayout->addWidget(clearButton);
+    listGroupBox->setLayout(listLayout);
+
+    // Action Group
+    QGroupBox *actionGroupBox = new QGroupBox("Action", this);
+    QVBoxLayout *actionLayout = new QVBoxLayout();
+    actionLayout->addWidget(deleteButton);
+    actionLayout->addWidget(moveButton);
+    actionLayout->addWidget(copyButton);
+    actionGroupBox->setLayout(actionLayout);
+
+    // YOLO Group
+    QGroupBox *yoloGroupBox = new QGroupBox("YOLO", this);
+    QVBoxLayout *yoloLayout = new QVBoxLayout();
+    yoloLayout->addWidget(toggleYoloButton);
+    yoloLayout->addWidget(loadNamesButton);
+    yoloGroupBox->setLayout(yoloLayout);
+
+    // Main Layout for action buttons
+    QVBoxLayout *actionButtonLayout = new QVBoxLayout();
+    actionButtonLayout->addWidget(listGroupBox);     // Add List group
+    actionButtonLayout->addWidget(actionGroupBox);   // Add Action group
+    actionButtonLayout->addWidget(yoloGroupBox);     // Add YOLO group
 
     // Style the buttons
     styleButton(leftButton);
@@ -95,6 +150,9 @@ MainWindow::MainWindow(QWidget *parent)
     styleButton(clearButton);
     styleButton(deleteButton);
     styleButton(moveButton);
+    styleButton(copyButton);
+    styleButton(toggleYoloButton);
+    styleButton(loadNamesButton); // Apply your existing styling
 
     // Set button sizes
     QSize buttonSize(60, 40);
@@ -106,6 +164,7 @@ MainWindow::MainWindow(QWidget *parent)
     clearButton->setMinimumWidth(80);
     deleteButton->setMinimumWidth(80);
     moveButton->setMinimumWidth(80);
+    copyButton->setMinimumWidth(80);
 
     addButton->setFixedHeight(buttonSize.height());
     removeButton->setFixedHeight(buttonSize.height());
@@ -113,7 +172,11 @@ MainWindow::MainWindow(QWidget *parent)
     clearButton->setFixedHeight(buttonSize.height());
     deleteButton->setFixedHeight(buttonSize.height());
     moveButton->setFixedHeight(buttonSize.height());
+    copyButton->setFixedHeight(buttonSize.height());
+    toggleYoloButton->setFixedHeight(buttonSize.height());
+    loadNamesButton->setFixedHeight(buttonSize.height());
 
+    // Connect buttons to functions
     connect(leftButton, &QPushButton::clicked, this, &MainWindow::showPreviousImage);
     connect(rightButton, &QPushButton::clicked, this, &MainWindow::showNextImage);
     connect(addButton, &QPushButton::clicked, this, &MainWindow::addImageToList);
@@ -122,6 +185,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(clearButton, &QPushButton::clicked, this, &MainWindow::clearImageList);
     connect(deleteButton, &QPushButton::clicked, this, &MainWindow::deleteSelectedImage);
     connect(moveButton, &QPushButton::clicked, this, &MainWindow::moveSelectedImage);
+    connect(copyButton, &QPushButton::clicked, this, &MainWindow::copySelectedImages);
+    connect(toggleYoloButton, &QPushButton::clicked, this, &MainWindow::toggleYoloBoundingBoxes);
+    connect(loadNamesButton, &QPushButton::clicked, this, &MainWindow::on_loadNamesFileButton_clicked);
 
     // Layout for navigation buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -129,15 +195,6 @@ MainWindow::MainWindow(QWidget *parent)
     buttonLayout->addWidget(leftButton);
     buttonLayout->addWidget(rightButton);
     buttonLayout->addStretch();
-
-    // Layout for add/remove/save buttons
-    QVBoxLayout *actionButtonLayout = new QVBoxLayout();
-    actionButtonLayout->addWidget(addButton);
-    actionButtonLayout->addWidget(removeButton);
-    actionButtonLayout->addWidget(saveButton);
-    actionButtonLayout->addWidget(clearButton);
-    actionButtonLayout->addWidget(deleteButton);
-    actionButtonLayout->addWidget(moveButton);
 
     // Create the list widget for image paths
     imageListWidget = new QListWidget(this);
@@ -195,6 +252,7 @@ MainWindow::MainWindow(QWidget *parent)
         logStream.setDevice(&logFile);
         logActivity("Application started.");
     }
+
     // Create the menu bar
     QMenuBar *menuBar = new QMenuBar(this);
     QMenu *fileMenu = new QMenu("File", menuBar);
@@ -203,6 +261,14 @@ MainWindow::MainWindow(QWidget *parent)
     fileMenu->addAction(openDirAction);
     menuBar->addMenu(fileMenu);
     setMenuBar(menuBar);
+
+    // Style the list panel
+    imageListWidget->setStyleSheet(
+        "QListWidget {"
+        "   color: black;"
+        "   background-color: white;"
+        "}"
+        );
 
     // Style the menu bar
     menuBar->setStyleSheet("QMenuBar { background-color: #003366; color: white; }"
@@ -222,6 +288,9 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         showNextImage();
     } else if (event->key() == Qt::Key_Left) {
         showPreviousImage();
+    } else if (event->key() == Qt::Key_A) {
+        addImageToList();
+        showNextImage(); // Move to the next image after adding
     }
 }
 
@@ -236,7 +305,7 @@ void MainWindow::openImageDirectory() {
         // Set new directory
         directory.setPath(dirPath);
         QStringList filters;
-        filters << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp";
+        filters << "*.png" << "*.jpg" << "*.jpeg" << "*.JPG";
         imageList = directory.entryList(filters, QDir::Files, QDir::Name);
 
         // Log activity
@@ -268,27 +337,11 @@ void MainWindow::loadImagesFromDirectory() {
     if (!dirPath.isEmpty()) {
         directory.setPath(dirPath);
         QStringList filters;
-        filters << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp";
+        filters << "*.png" << "*.jpg" << "*.jpeg" << "*.JPG";
         imageList = directory.entryList(filters, QDir::Files, QDir::Name);
         currentImageIndex = 0;
         logActivity("Loaded images from directory: " + dirPath);
     }
-}
-
-void MainWindow::updateImage() {
-    if (imageList.isEmpty()) return;
-
-    QString imagePath = directory.filePath(imageList.at(currentImageIndex));
-    QImage image(imagePath);
-
-    if (image.isNull()) return;
-
-    imageLabel->setPixmap(QPixmap::fromImage(image).scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-
-    QString imageName = "Image: " + imageList.at(currentImageIndex);
-    QString resolution = "Resolution: " + QString::number(image.width()) + " x " + QString::number(image.height());
-
-    infoLabel->setText(imageName + "<br>" + resolution);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event) {
@@ -305,7 +358,11 @@ void MainWindow::addImageToList() {
         imageListWidget->addItem(imagePath);
         logActivity("Added image path to list: " + imagePath);
     }
+
+    // Set focus back to the image area
+    imageLabel->setFocus();
 }
+
 
 void MainWindow::removeImageFromList() {
     QList<QListWidgetItem*> selectedItems = imageListWidget->selectedItems();
@@ -498,10 +555,183 @@ void MainWindow::moveSelectedImage() {
     updateImage();
 }
 
+void MainWindow::copySelectedImages() {
+    if (selectedImagePaths.isEmpty()) {
+        QMessageBox::information(this, "No Selection", "Please select at least one image to copy.");
+        return;
+    }
+
+    QString destinationFolder = QFileDialog::getExistingDirectory(this, "Select Destination Folder");
+    if (destinationFolder.isEmpty()) {
+        return; // User cancelled
+    }
+
+    for (const QString &imagePath : selectedImagePaths) {
+        QFileInfo fileInfo(imagePath);
+        QString destinationFilePath = destinationFolder + "/" + fileInfo.fileName();
+
+        if (QFile::exists(destinationFilePath)) {
+            int ret = QMessageBox::warning(this, "File Exists",
+                                           QString("The file %1 already exists in the destination folder. Do you want to overwrite it?")
+                                               .arg(fileInfo.fileName()),
+                                           QMessageBox::Yes | QMessageBox::No);
+            if (ret == QMessageBox::No) {
+                continue;
+            }
+        }
+
+        if (!QFile::copy(imagePath, destinationFilePath)) {
+            QMessageBox::warning(this, "Copy Failed", QString("Failed to copy %1").arg(fileInfo.fileName()));
+        }
+    }
+
+    QMessageBox::information(this, "Copy Completed", "Selected images have been copied successfully.");
+}
 
 void MainWindow::logActivity(const QString &message) {
     if (logFile.isOpen()) {
         logStream << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") << " - " << message << "\n";
         logStream.flush();
     }
+}
+
+
+// Toggle YOLO bounding boxes
+void MainWindow::toggleYoloBoundingBoxes() {
+    showYoloBoundingBoxes = !showYoloBoundingBoxes;
+    if (showYoloBoundingBoxes) {
+        displayBoundingBoxes();
+    } else {
+        hideBoundingBoxes();
+    }
+}
+
+// Display YOLO bounding boxes
+void MainWindow::displayBoundingBoxes() {
+    if (!currentImage.isNull() && !currentAnnotations.isEmpty()) {
+        QImage img = currentImage;
+        QPainter painter(&img);
+        painter.setPen(QPen(Qt::red, 2));
+
+        for (const auto &annotation : currentAnnotations) {
+            QRect box = annotation.boundingBox;
+            painter.drawRect(box);
+            painter.drawText(box.topLeft(), annotation.className + " (" + QString::number(annotation.confidence) + ")");
+        }
+
+        painter.end();
+        imageLabel->setPixmap(QPixmap::fromImage(img));
+    }
+}
+
+// Hide YOLO bounding boxes
+void MainWindow::hideBoundingBoxes() {
+    updateImage();
+}
+void MainWindow::updateImage() {
+    if (imageList.isEmpty()) return;
+
+    QString imagePath = directory.filePath(imageList.at(currentImageIndex));
+    QImage image(imagePath);
+
+    if (image.isNull()) return;
+
+    QPixmap pixmap = QPixmap::fromImage(image);
+
+    // Draw YOLO bounding boxes if toggle is ON
+    if (showYoloBoundingBoxes) {
+        QString annotationFilePath = imagePath;
+        annotationFilePath.replace(".jpg", ".txt").replace(".JPG", ".txt");
+
+        QFile file(annotationFilePath);
+        if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QPainter painter(&pixmap);
+            QTextStream in(&file);
+            while (!in.atEnd()) {
+                QString line = in.readLine();
+                QStringList values = line.split(" ");
+                if (values.size() >= 5) {
+                    int classId = values[0].toInt();
+                    double x = values[1].toDouble();
+                    double y = values[2].toDouble();
+                    double width = values[3].toDouble();
+                    double height = values[4].toDouble();
+
+                    // Convert YOLO normalized values to actual coordinates
+                    int xTopLeft = static_cast<int>((x - width / 2) * pixmap.width());
+                    int yTopLeft = static_cast<int>((y - height / 2) * pixmap.height());
+                    int boxWidth = static_cast<int>(width * pixmap.width());
+                    int boxHeight = static_cast<int>(height * pixmap.height());
+
+                    // Get the color for the current class
+                    QColor color = classColors.value(classId, QColor(Qt::red));  // Use QColor with default fallback
+                    painter.setPen(QPen(color, 2));
+
+                    // Draw bounding box
+                    painter.drawRect(xTopLeft, yTopLeft, boxWidth, boxHeight);
+
+                    // Get class name from the .names file
+                    QString className = getClassName(classId);  // Fetch the class name
+
+                    // Optionally draw class label
+                    painter.drawText(xTopLeft, yTopLeft - 5, className);  // Draw the class name directly
+                }
+            }
+            painter.end();
+            file.close();
+        } else {
+            QMessageBox::information(this, "YOLO Bounding Boxes", "No annotation file found for this image.");
+        }
+    }
+
+    imageLabel->setPixmap(pixmap.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    // Display image name and resolution
+    QString imageName = "Image: " + imageList.at(currentImageIndex);
+    QString resolution = "Resolution: " + QString::number(image.width()) + " x " + QString::number(image.height());
+    infoLabel->setText(imageName + "<br>" + resolution);
+}
+
+
+
+
+void MainWindow::loadClassNames(const QString& namesFilePath) {
+    QFile file(namesFilePath);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        classNames.clear();
+        while (!in.atEnd()) {
+            QString line = in.readLine();
+            if (!line.isEmpty()) {
+                classNames.append(line);
+            }
+        }
+        file.close();
+    } else {
+        QMessageBox::warning(this, "Error", "Failed to open names file.");
+    }
+}
+
+void MainWindow::on_loadNamesFileButton_clicked() {
+    QString namesFilePath = QFileDialog::getOpenFileName(this, "Open Names File", "", "Names Files (*.names);;All Files (*)");
+
+    if (!namesFilePath.isEmpty()) {
+        loadClassNames(namesFilePath);
+        QMessageBox::information(this, "Names File", "Names file loaded successfully.");
+    } else {
+        QMessageBox::warning(this, "Names File", "No file selected.");
+    }
+}
+
+
+QString MainWindow::getClassName(int classId) {
+    if (classId >= 0 && classId < classNames.size()) {
+        return classNames[classId];
+    } else {
+        return QString("Class %1").arg(classId);  // Fallback to "Class x" if not found
+    }
+}
+
+MainWindow::~MainWindow() {
+    // Destructor - no custom cleanup needed
 }

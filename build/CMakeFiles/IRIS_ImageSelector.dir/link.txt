@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/IRIS_ImageSelector.dir/IRIS_ImageSelector_autogen/mocs_compilation.cpp.o CMakeFiles/IRIS_ImageSelector.dir/main.cpp.o CMakeFiles/IRIS_ImageSelector.dir/mainwindow.cpp.o -o IRIS_ImageSelector  /usr/lib/x86_64-linux-gnu/libQt5Widgets.so.5.15.3 /usr/lib/x86_64-linux-gnu/libQt5Gui.so.5.15.3 /usr/lib/x86_64-linux-gnu/libQt5Core.so.5.15.3 
