@@ -11,6 +11,7 @@ General flow of application:
 8. Delete Action uses the selected image paths and moves all the images from current directory to a folder called "deleted_images" in the current image directory's parent directory
 9. Move Action uses the same principle as Delete but user must choose the folder. For example, if user is selecting images to move to train from a raw image folder, user can choose the folder "Train." Once user is done moving the images, user should click on "Clear List" to clear the list. User will be prompted to create a txt file to save image paths again. User can choose the pre-existing file (then the future content replaces the previous content) or create a new file if the purpose has changed.
 10. Copy Action uses the same principle as above but to copy imaegs to a folder of user's choice.
+11. Toggle YOLO Bounding Boxes and Choose Names File buttons: Find a names file in .names extension and click on Toggle YOLO Bounding Boxes button once to enable viewing the annotations. Click the button again to stop viewing the annotations.
 
 Instructions:
 ```
