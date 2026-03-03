@@ -16,6 +16,7 @@
 #include <QResizeEvent>
 #include <QRegularExpression>
 #include <QStatusBar>
+#include <QSet>
 #include <QTableWidget>
 #include <QVBoxLayout>
 #include <QSize>
@@ -23,6 +24,10 @@
 #include <QUrl>
 #include <QDesktopServices>
 #include <QToolBar>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonValue>
 
 #include <algorithm>
 
@@ -138,6 +143,34 @@ MainWindow::MainWindow(QWidget *parent)
     imageLabel->setAlignment(Qt::AlignCenter);
     imageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
+    // Compare widget (hidden by default)
+    compareWidget = new QWidget(this);
+    compareLeftImageLabel = new QLabel(this);
+    compareRightImageLabel = new QLabel(this);
+    compareLeftInfoLabel = new QLabel(this);
+    compareRightInfoLabel = new QLabel(this);
+
+    for (QLabel *l : {compareLeftImageLabel, compareRightImageLabel}) {
+        l->setAlignment(Qt::AlignCenter);
+        l->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    }
+    for (QLabel *l : {compareLeftInfoLabel, compareRightInfoLabel}) {
+        l->setAlignment(Qt::AlignCenter);
+        l->setStyleSheet("QLabel { color: black; background-color: transparent; }");
+    }
+
+    QVBoxLayout *leftCol = new QVBoxLayout();
+    leftCol->addWidget(compareLeftImageLabel, 1);
+    leftCol->addWidget(compareLeftInfoLabel);
+    QVBoxLayout *rightCol = new QVBoxLayout();
+    rightCol->addWidget(compareRightImageLabel, 1);
+    rightCol->addWidget(compareRightInfoLabel);
+    QHBoxLayout *compareRow = new QHBoxLayout();
+    compareRow->addLayout(leftCol, 1);
+    compareRow->addLayout(rightCol, 1);
+    compareWidget->setLayout(compareRow);
+    compareWidget->setVisible(false);
+
     // Info label (center below image)
     infoLabel = new QLabel(this);
     infoLabel->setAlignment(Qt::AlignCenter);
@@ -194,9 +227,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     toggleYoloButton = new QPushButton("Toggle YOLO Bounding Boxes", this);
     loadNamesButton = new QPushButton("Load Class Names", this);
+    loadLabelsButton = new QPushButton("Load Labels Directory", this);
+
+        toggleCocoButton = new QPushButton("Toggle COCO Annotations", this);
+    loadCocoButton = new QPushButton("Load COCO Folder", this);
+
+    toggleLabelMeButton = new QPushButton("Toggle LabelMe Segmentation", this);
+    loadLabelMeButton = new QPushButton("Load LabelMe Folder", this);
 
     for (QPushButton *b : {configureTaggingButton, addButton, removeButton, saveButton, clearButton,
-                           deleteButton, moveButton, copyButton, toggleYoloButton, loadNamesButton}) {
+                           deleteButton, moveButton, copyButton, toggleYoloButton, loadNamesButton, loadLabelsButton, toggleCocoButton, loadCocoButton, toggleLabelMeButton, loadLabelMeButton}) {
         styleButton(b);
         b->setFixedHeight(40);
     }
@@ -220,6 +260,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     QVBoxLayout *imageCol = new QVBoxLayout();
     imageCol->addWidget(imageLabel, 1);
+    imageCol->addWidget(compareWidget, 1);
     imageCol->addWidget(imageSlider);
     imageCol->addLayout(navRow);
     imageCol->addWidget(infoLabel);
@@ -240,8 +281,41 @@ MainWindow::MainWindow(QWidget *parent)
     listLayout->addWidget(clearButton);
     listGroup->setLayout(listLayout);
     rightPanel->addWidget(listGroup);
-    // (removed duplicate List group)
-rightPanel->addWidget(lastSavedLabel);
+    rightPanel->addWidget(lastSavedLabel);
+
+    // Action controls
+    QGroupBox *actionGroup = new QGroupBox("Action", this);
+    QVBoxLayout *actionLayout = new QVBoxLayout();
+    actionLayout->addWidget(deleteButton);
+    actionLayout->addWidget(moveButton);
+    actionLayout->addWidget(copyButton);
+    actionGroup->setLayout(actionLayout);
+    rightPanel->addWidget(actionGroup);
+
+    // YOLO controls
+    QGroupBox *yoloGroup = new QGroupBox("YOLO", this);
+    QVBoxLayout *yoloLayout = new QVBoxLayout();
+    yoloLayout->addWidget(toggleYoloButton);
+    yoloLayout->addWidget(loadNamesButton);
+    yoloLayout->addWidget(loadLabelsButton);
+    yoloGroup->setLayout(yoloLayout);
+    rightPanel->addWidget(yoloGroup);
+
+    // COCO controls
+    QGroupBox *cocoGroup = new QGroupBox("COCO", this);
+    QVBoxLayout *cocoLayout = new QVBoxLayout();
+    cocoLayout->addWidget(toggleCocoButton);
+    cocoLayout->addWidget(loadCocoButton);
+    cocoGroup->setLayout(cocoLayout);
+    rightPanel->addWidget(cocoGroup);
+
+    // LabelMe controls
+    QGroupBox *labelMeGroup = new QGroupBox("LabelMe", this);
+    QVBoxLayout *labelMeLayout = new QVBoxLayout();
+    labelMeLayout->addWidget(toggleLabelMeButton);
+    labelMeLayout->addWidget(loadLabelMeButton);
+    labelMeGroup->setLayout(labelMeLayout);
+    rightPanel->addWidget(labelMeGroup);
 
     // Spacers: fixed left gap, expandable right
     QSpacerItem *leftSpacer = new QSpacerItem(200, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
@@ -334,6 +408,17 @@ rightPanel->addWidget(lastSavedLabel);
     QPushButton *tbLoadNames = makeTbBtn("Load Names", QStyle::SP_FileIcon, "Load .names file for class labels");
     topBar->addWidget(tbLoadNames);
 
+    QPushButton *tbLoadLabels = makeTbBtn("Load Labels", QStyle::SP_DirOpenIcon, "Select a labels directory containing YOLO .txt files (optional)");
+    topBar->addWidget(tbLoadLabels);
+
+    topBar->addSeparator();
+
+    QPushButton *tbCompare = makeTbBtn("Compare", QStyle::SP_FileDialogDetailedView, "Compare two model output folders side-by-side");
+    topBar->addWidget(tbCompare);
+
+    QPushButton *tbExitCompare = makeTbBtn("Exit Compare", QStyle::SP_DialogCloseButton, "Exit compare mode");
+    topBar->addWidget(tbExitCompare);
+
     auto syncTbYoloToggle = [this, tbYoloToggle]() {
         if (showYoloBoundingBoxes) {
             tbYoloToggle->setStyleSheet(
@@ -369,6 +454,9 @@ rightPanel->addWidget(lastSavedLabel);
         syncTbYoloToggle();
     });
     connect(tbLoadNames, &QPushButton::clicked, this, &MainWindow::on_loadNamesFileButton_clicked);
+    connect(tbLoadLabels, &QPushButton::clicked, this, &MainWindow::on_loadLabelsDirButton_clicked);
+    connect(tbCompare, &QPushButton::clicked, this, &MainWindow::startCompareMode);
+    connect(tbExitCompare, &QPushButton::clicked, this, &MainWindow::exitCompareMode);
 
     mb->setStyleSheet("QMenuBar { background-color: #003366; color: white; }"
                       "QMenuBar::item { color: white; }"
@@ -380,6 +468,13 @@ rightPanel->addWidget(lastSavedLabel);
     connect(rightButton, &QPushButton::clicked, this, &MainWindow::showNextImage);
 
     connect(imageSlider, &QSlider::valueChanged, this, [this](int v){
+        if (compareMode) {
+            if (compareImageList.isEmpty()) return;
+            v = std::clamp(v, 0, compareImageList.size()-1);
+            compareIndex = v;
+            updateCompareView();
+            return;
+        }
         if (imageList.isEmpty()) return;
         v = std::clamp(v, 0, imageList.size()-1);
         currentImageIndex = v;
@@ -398,7 +493,12 @@ rightPanel->addWidget(lastSavedLabel);
     connect(copyButton, &QPushButton::clicked, this, &MainWindow::copySelectedImages);
 
     connect(toggleYoloButton, &QPushButton::clicked, this, &MainWindow::toggleYoloBoundingBoxes);
+    connect(toggleCocoButton, &QPushButton::clicked, this, &MainWindow::toggleCocoAnnotations);
+    connect(loadCocoButton, &QPushButton::clicked, this, &MainWindow::on_loadCocoJsonButton_clicked);
+    connect(toggleLabelMeButton, &QPushButton::clicked, this, &MainWindow::toggleLabelMeAnnotations);
+    connect(loadLabelMeButton, &QPushButton::clicked, this, &MainWindow::on_loadLabelMeDirButton_clicked);
     connect(loadNamesButton, &QPushButton::clicked, this, &MainWindow::on_loadNamesFileButton_clicked);
+    connect(loadLabelsButton, &QPushButton::clicked, this, &MainWindow::on_loadLabelsDirButton_clicked);
 
     // Logging
     const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
@@ -410,7 +510,8 @@ rightPanel->addWidget(lastSavedLabel);
     }
 
     // Startup: prompt for folder
-    loadImagesFromDirectory();
+	    if (compareMode) exitCompareMode();
+	    loadImagesFromDirectory();
     updateImage();
 
     // initial YOLO toggle style
@@ -584,8 +685,22 @@ void MainWindow::openImageDirectory()
     pruneMissingFiles();
     rebuildCategoryTabs();
     updateImage();
-}void MainWindow::showPreviousImage()
+	}
+
+void MainWindow::showPreviousImage()
 {
+    if (compareMode) {
+        if (compareImageList.isEmpty()) return;
+        if (compareIndex > 0) {
+            --compareIndex;
+            imageSlider->blockSignals(true);
+            imageSlider->setValue(compareIndex);
+            imageSlider->blockSignals(false);
+            updateCompareView();
+        }
+        return;
+    }
+
     if (imageList.isEmpty()) return;
 
     if (currentImageIndex > 0) {
@@ -600,6 +715,18 @@ void MainWindow::openImageDirectory()
 
 void MainWindow::showNextImage()
 {
+    if (compareMode) {
+        if (compareImageList.isEmpty()) return;
+        if (compareIndex < compareImageList.size() - 1) {
+            ++compareIndex;
+            imageSlider->blockSignals(true);
+            imageSlider->setValue(compareIndex);
+            imageSlider->blockSignals(false);
+            updateCompareView();
+        }
+        return;
+    }
+
     if (imageList.isEmpty()) return;
 
     if (currentImageIndex < imageList.size() - 1) {
@@ -617,44 +744,47 @@ void MainWindow::showNextImage()
 // ------------------------------------------------------------
 void MainWindow::updateImage()
 {
-    if (imageList.isEmpty()) {
-        imageLabel->setText("No images loaded.");
-        infoLabel->clear();
-        indexLabel->setText("0 / 0");
+    if (compareMode) {
+        updateCompareView();
         return;
     }
-
-    currentImageIndex = std::clamp(currentImageIndex, 0, imageList.size()-1);
+    if (imageList.isEmpty()) return;
 
     const QString imagePath = directory.filePath(imageList.at(currentImageIndex));
+    QImage image(imagePath);
+    if (image.isNull()) return;
 
-    currentImage = QImage(imagePath);
-    if (currentImage.isNull()) {
-        imageLabel->setText("Failed to load image.");
-        return;
-    }
+    currentImage = image;
 
-    loadYOLOAnnotations(imagePath);
-
-    QImage display = currentImage;
+    // Apply YOLO overlay from effective labels directory (can be separate from images)
     if (showYoloBoundingBoxes) {
-        display = renderBoundingBoxesOn(display);
+        const QString labelsDir = effectiveLabelsDirForSingleView();
+        image = renderBoundingBoxesOn(image, imagePath, labelsDir);
     }
 
-    QPixmap pix = QPixmap::fromImage(display);
-    pix = pix.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    imageLabel->setPixmap(pix);
+    // Apply COCO overlay (bbox + segmentation polygons), if enabled
+    if (showCocoAnnotations && !cocoJsonPath.isEmpty()) {
+        image = renderCocoForPath(image, imagePath, cocoJsonPath, cocoCacheSingle);
+    }
 
-    const QFileInfo fi(imagePath);
-    const QString folderAbs = directory.absolutePath();
-    const QString folderBase = QFileInfo(folderAbs).fileName().isEmpty() ? folderAbs : QFileInfo(folderAbs).fileName();
-    infoLabel->setText(QString("%1\nFolder: %2\n%3 x %4")
-                           .arg(fi.fileName())
-                           .arg(folderBase)
-                           .arg(currentImage.width())
-                           .arg(currentImage.height()));
+    // Apply LabelMe overlay (polygon/rectangle), if enabled
+    if (showLabelMeAnnotations) {
+        const QString lmDir = labelMeJsonDirPath.isEmpty() ? directory.absolutePath() : labelMeJsonDirPath;
+        image = renderLabelMeOn(image, imagePath, lmDir);
+    }
 
-    indexLabel->setText(QString("%1 / %2").arg(currentImageIndex + 1).arg(imageList.size()));
+    imageLabel->setPixmap(QPixmap::fromImage(image)
+                              .scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    const QString imageName = "Image: " + imageList.at(currentImageIndex);
+    QString resolution = QString("Resolution: %1 x %2").arg(image.width()).arg(image.height());
+    if (!yoloLabelsDirPath.trimmed().isEmpty()) {
+        resolution += "<br>YOLO labels: " + yoloLabelsDirPath;
+    }
+    if (cocoCacheSingle.loaded && !cocoJsonPath.trimmed().isEmpty()) {
+        resolution += "<br>COCO: " + cocoJsonPath;
+    }
+    infoLabel->setText(imageName + "<br>" + resolution);
 }
 
 // ------------------------------------------------------------
@@ -691,81 +821,108 @@ void MainWindow::on_loadNamesFileButton_clicked()
     updateImage();
 }
 
-void MainWindow::loadYOLOAnnotations(const QString &imagePath)
+void MainWindow::on_loadLabelsDirButton_clicked()
 {
-    currentAnnotations.clear();
+    const QString dir = QFileDialog::getExistingDirectory(this, "Select Labels Directory (YOLO .txt)");
+    if (dir.isEmpty()) return;
+    yoloLabelsDirPath = dir;
+    logActivity("Set labels directory: " + yoloLabelsDirPath);
+    updateImage();
+}
 
-    QFileInfo fi(imagePath);
-    const QString txtPath = fi.dir().filePath(fi.completeBaseName() + ".txt");
-    QFile f(txtPath);
-    if (!f.exists()) return;
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+QString MainWindow::effectiveLabelsDirForSingleView() const
+{
+    if (!yoloLabelsDirPath.trimmed().isEmpty()) return yoloLabelsDirPath;
+    return directory.absolutePath();
+}
 
-    QTextStream in(&f);
-    const int W = currentImage.width();
-    const int H = currentImage.height();
+QImage MainWindow::renderBoundingBoxesOn(const QImage &img,
+                                        const QString &imagePath,
+                                        const QString &labelsDir) const
+{
+    QImage out = img.convertToFormat(QImage::Format_RGB32);
 
+    const int W = out.width();
+    const int H = out.height();
+
+    const QString base = QFileInfo(imagePath).completeBaseName();
+    const QString txtPath = QDir(labelsDir).filePath(base + ".txt");
+    QFile file(txtPath);
+    if (!file.exists()) return out;
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return out;
+
+    QPainter p(&out);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    QVector<QRect> placedLabelRects;
+    QTextStream in(&file);
     while (!in.atEnd()) {
         const QString line = in.readLine().trimmed();
         if (line.isEmpty()) continue;
-
-        const QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-        if (parts.size() < 5) continue;
+        const QStringList values = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+        if (values.size() < 5) continue;
 
         bool ok0=false, ok1=false, ok2=false, ok3=false, ok4=false, ok5=true;
-        int cls = parts[0].toInt(&ok0);
-        double xc = parts[1].toDouble(&ok1);
-        double yc = parts[2].toDouble(&ok2);
-        double ww = parts[3].toDouble(&ok3);
-        double hh = parts[4].toDouble(&ok4);
+        const int cls = values[0].toInt(&ok0);
+        const double xc = values[1].toDouble(&ok1);
+        const double yc = values[2].toDouble(&ok2);
+        const double ww = values[3].toDouble(&ok3);
+        const double hh = values[4].toDouble(&ok4);
         float conf = 0.0f;
-        if (parts.size() >= 6) conf = parts[5].toFloat(&ok5);
-
+        if (values.size() >= 6) conf = values[5].toFloat(&ok5);
         if (!(ok0 && ok1 && ok2 && ok3 && ok4 && ok5)) continue;
 
         const int x = int((xc - ww/2.0) * W);
         const int y = int((yc - hh/2.0) * H);
         const int w = int(ww * W);
         const int h = int(hh * H);
+        const QRect bbox(x, y, w, h);
 
-        Annotation a;
-        a.classId = cls;
-        a.className = getClassName(cls);
-        a.confidence = conf;
-        a.boundingBox = QRect(x, y, w, h);
-        currentAnnotations.push_back(a);
-    }
+        const QString clsName = getClassName(cls);
+        QString label = clsName;
+        if (conf > 0.0f) label += QString(" (%1)").arg(conf, 0, 'f', 2);
 
-    f.close();
-}
-
-QImage MainWindow::renderBoundingBoxesOn(const QImage &img) const
-{
-    QImage out = img.copy();
-    QPainter p(&out);
-    p.setRenderHint(QPainter::Antialiasing, true);
-
-    for (const auto &a : currentAnnotations) {
-        QColor c = classColors.contains(a.classId) ? classColors.value(a.classId) : QColor("#00FF00");
+        QColor c = classColors.contains(cls) ? classColors.value(cls) : QColor("#00FF00");
         QPen pen(c, 3);
         p.setPen(pen);
-        p.drawRect(a.boundingBox);
-
-        QString label = a.className;
-        if (a.confidence > 0.0f) label += QString(" (%1)").arg(a.confidence, 0, 'f', 2);
+        p.drawRect(bbox);
 
         QFont font = p.font();
         font.setBold(true);
         font.setPointSize(10);
         p.setFont(font);
 
-        const QRect r = a.boundingBox.adjusted(0, -22, 0, 0);
-        p.fillRect(QRect(r.left(), r.top(), std::max(60, r.width()), 20), QColor(0, 0, 0, 140));
+        const int pad = 4;
+        QRect textRect = p.fontMetrics().boundingRect(label);
+        textRect.adjust(-pad, -pad, pad, pad);
+
+        int tx = bbox.left();
+        int ty = bbox.top() - textRect.height() - 2;
+
+        QRect labelRect(tx, ty, std::max(60, textRect.width()), textRect.height());
+        // avoid collisions with previous labels
+        for (int iter = 0; iter < 20; ++iter) {
+            bool collide = false;
+            for (const QRect &r : placedLabelRects) {
+                if (labelRect.intersects(r)) { collide = true; break; }
+            }
+            if (!collide) break;
+            ty -= (labelRect.height() + 2);
+            labelRect.moveTop(ty);
+        }
+        if (labelRect.top() < 0) {
+            // fallback: draw inside bbox
+            labelRect.moveTop(bbox.top() + 2);
+        }
+        placedLabelRects.push_back(labelRect);
+
+        p.fillRect(labelRect, QColor(0, 0, 0, 140));
         p.setPen(Qt::white);
-        p.drawText(QRect(r.left()+4, r.top(), std::max(60, r.width()), 20), Qt::AlignVCenter, label);
+        p.drawText(labelRect.adjusted(pad, 0, -pad, 0), Qt::AlignVCenter, label);
     }
 
     p.end();
+    file.close();
     return out;
 }
 
@@ -773,8 +930,813 @@ void MainWindow::toggleYoloBoundingBoxes()
 {
     showYoloBoundingBoxes = !showYoloBoundingBoxes;
     updateToggleYoloButtonStyle();
-    updateImage();
+    if (compareMode) updateCompareView();
+    else updateImage();
     logActivity(QString("YOLO bounding boxes %1").arg(showYoloBoundingBoxes ? "ON" : "OFF"));
+}
+
+
+// ------------------------------------------------------------
+// COCO
+// ------------------------------------------------------------
+static QColor cocoColorForId(int id)
+{
+    const int hue = (id * 47) % 360;
+    return QColor::fromHsv(hue, 220, 230);
+}
+
+// Decode COCO uncompressed RLE (counts array) into an alpha mask.
+// COCO RLE is column-major (Fortran order): index i maps to (x=i/h, y=i%h)
+static QImage decodeCocoRleCountsArray(const QJsonArray &counts, int h, int w)
+{
+    if (h <= 0 || w <= 0 || counts.isEmpty()) return QImage();
+
+    QImage mask(w, h, QImage::Format_Alpha8);
+    mask.fill(0);
+
+    const int total = h * w;
+    int idx = 0;
+    int val = 0; // starts with background
+
+    for (const QJsonValue &cv : counts) {
+        const int run = cv.toInt(0);
+        if (run <= 0) continue;
+        const int end = std::min(total, idx + run);
+        if (val == 1) {
+            for (int i = idx; i < end; ++i) {
+                const int x = i / h;
+                const int y = i % h;
+                if (x >= 0 && x < w && y >= 0 && y < h) {
+                    mask.scanLine(y)[x] = 255;
+                }
+            }
+        }
+        idx = end;
+        val = 1 - val;
+        if (idx >= total) break;
+    }
+
+    return mask;
+}
+
+QString MainWindow::imageFileNameKey(const QString &imagePath) const
+{
+    // COCO image file_name may include subfolders; we key by basename for robustness.
+    return QFileInfo(imagePath).fileName();
+}
+
+bool MainWindow::loadCocoJson(const QString &jsonPath, CocoCache &cache)
+{
+    cache = CocoCache{};
+    cache.jsonPath = jsonPath;
+
+    QFile f(jsonPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, "COCO", "Failed to open COCO JSON file.");
+        return false;
+    }
+
+    const QByteArray bytes = f.readAll();
+    f.close();
+
+    QJsonParseError err{};
+    const QJsonDocument doc = QJsonDocument::fromJson(bytes, &err);
+    if (doc.isNull() || !doc.isObject()) {
+        QMessageBox::warning(this, "COCO", "Invalid COCO JSON (parse error).\n" + err.errorString());
+        return false;
+    }
+
+    const QJsonObject root = doc.object();
+
+    // categories
+    const QJsonArray categories = root.value("categories").toArray();
+    for (const QJsonValue &v : categories) {
+        const QJsonObject o = v.toObject();
+        const int id = o.value("id").toInt(-1);
+        const QString name = o.value("name").toString();
+        if (id >= 0 && !name.isEmpty()) cache.categoryIdToName.insert(id, name);
+    }
+
+    // images
+    const QJsonArray images = root.value("images").toArray();
+    for (const QJsonValue &v : images) {
+        const QJsonObject o = v.toObject();
+        const int id = o.value("id").toInt(-1);
+        const QString fileName = o.value("file_name").toString();
+        if (id < 0 || fileName.isEmpty()) continue;
+        cache.fileNameToImageId.insert(fileName, id);
+        const QString base = QFileInfo(fileName).fileName();
+        if (!base.isEmpty()) cache.fileNameToImageId.insert(base, id);
+    }
+
+    // annotations
+    const QJsonArray anns = root.value("annotations").toArray();
+    for (const QJsonValue &v : anns) {
+        const QJsonObject o = v.toObject();
+        const int imageId = o.value("image_id").toInt(-1);
+        const int catId = o.value("category_id").toInt(-1);
+        if (imageId < 0 || catId < 0) continue;
+
+        CocoAnnotation ann;
+        ann.categoryId = catId;
+        ann.categoryName = cache.categoryIdToName.value(catId, QString("cat_%1").arg(catId));
+
+        const QJsonArray bbox = o.value("bbox").toArray();
+        if (bbox.size() == 4) {
+            const double x = bbox.at(0).toDouble();
+            const double y = bbox.at(1).toDouble();
+            const double w = bbox.at(2).toDouble();
+            const double h = bbox.at(3).toDouble();
+            ann.bbox = QRectF(x, y, w, h);
+        }
+
+        // segmentation (polygons)
+        const QJsonValue segV = o.value("segmentation");
+        if (segV.isArray()) {
+            const QJsonArray segA = segV.toArray();
+            if (!segA.isEmpty() && segA.at(0).isArray()) {
+                // list of polygons
+                for (const QJsonValue &polyV : segA) {
+                    const QJsonArray polyA = polyV.toArray();
+                    QPolygonF poly;
+                    for (int i = 0; i + 1 < polyA.size(); i += 2) {
+                        poly << QPointF(polyA.at(i).toDouble(), polyA.at(i + 1).toDouble());
+                    }
+                    if (poly.size() >= 3) ann.polygons.append(poly);
+                }
+            } else {
+                // single polygon flat list
+                QPolygonF poly;
+                for (int i = 0; i + 1 < segA.size(); i += 2) {
+                    poly << QPointF(segA.at(i).toDouble(), segA.at(i + 1).toDouble());
+                }
+                if (poly.size() >= 3) ann.polygons.append(poly);
+            }
+        }
+        // segmentation as RLE
+        // COCO allows segmentation to be RLE: {"counts": [...], "size": [h,w]} or compressed string.
+        if (segV.isObject()) {
+            const QJsonObject segO = segV.toObject();
+            const QJsonArray sizeA = segO.value("size").toArray();
+            const int h = sizeA.size() >= 1 ? sizeA.at(0).toInt(0) : 0;
+            const int w = sizeA.size() >= 2 ? sizeA.at(1).toInt(0) : 0;
+
+            const QJsonValue countsV = segO.value("counts");
+            if (countsV.isArray()) {
+                // Uncompressed RLE counts array
+                ann.rleMask = decodeCocoRleCountsArray(countsV.toArray(), h, w);
+            } else {
+                // Compressed RLE string needs the COCO RLE decode algorithm (pycocotools).
+                // We fall back to bbox-only rendering in this case.
+            }
+        }
+
+        cache.imageIdToAnns[imageId].append(ann);
+    }
+
+    cache.loaded = true;
+    return true;
+}
+
+QImage MainWindow::renderCocoOn(const QImage &img, const QString &imagePath, const CocoCache &cache) const
+{
+    if (!cache.loaded) return img;
+
+    const QString key = imageFileNameKey(imagePath);
+    const int imageId = cache.fileNameToImageId.value(key, -1);
+    if (imageId < 0) return img;
+
+    const QVector<CocoAnnotation> anns = cache.imageIdToAnns.value(imageId);
+    if (anns.isEmpty()) return img;
+
+    QImage out = img.convertToFormat(QImage::Format_RGB32);
+    QPainter p(&out);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    for (const CocoAnnotation &ann : anns) {
+        const QColor c = cocoColorForId(ann.categoryId);
+
+        // segmentation polygons (fill)
+        if (!ann.polygons.isEmpty()) {
+            QColor fill = c;
+            fill.setAlpha(60);
+            p.setBrush(QBrush(fill));
+            p.setPen(QPen(c, 2));
+            for (const QPolygonF &poly : ann.polygons) {
+                p.drawPolygon(poly);
+            }
+            p.setBrush(Qt::NoBrush);
+        }
+
+        // RLE mask (alpha) fill
+        if (!ann.rleMask.isNull()) {
+            QImage m = ann.rleMask;
+            if (m.width() != out.width() || m.height() != out.height()) {
+                m = m.scaled(out.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+            }
+
+            QImage overlay(out.size(), QImage::Format_ARGB32_Premultiplied);
+            overlay.fill(Qt::transparent);
+            const QColor cFill(c.red(), c.green(), c.blue(), 80);
+
+            for (int y = 0; y < overlay.height(); ++y) {
+                const uchar *a = m.constScanLine(y);
+                QRgb *dst = reinterpret_cast<QRgb*>(overlay.scanLine(y));
+                for (int x = 0; x < overlay.width(); ++x) {
+                    if (a[x] > 0) dst[x] = qRgba(cFill.red(), cFill.green(), cFill.blue(), cFill.alpha());
+                }
+            }
+            p.drawImage(0, 0, overlay);
+        }
+
+        // bbox
+        if (ann.bbox.isValid()) {
+            p.setPen(QPen(c, 3));
+            p.drawRect(ann.bbox);
+
+            // label
+            const QString label = ann.categoryName;
+            QFont font = p.font();
+            font.setBold(true);
+            font.setPointSize(10);
+            p.setFont(font);
+
+            const int pad = 4;
+            QRect tr = p.fontMetrics().boundingRect(label);
+            QRect bg(int(ann.bbox.x()), int(ann.bbox.y()) - tr.height() - 2*pad,
+                     tr.width() + 2*pad, tr.height() + 2*pad);
+            if (bg.y() < 0) bg.moveTop(int(ann.bbox.y()) + 2);
+
+            QColor bgc = c;
+            bgc.setAlpha(190);
+            p.fillRect(bg, bgc);
+            p.setPen(Qt::white);
+            p.drawText(bg.adjusted(pad, pad, -pad, -pad), Qt::AlignLeft | Qt::AlignVCenter, label);
+        }
+    }
+
+    p.end();
+    return out;
+}
+
+
+// Load a per-image COCO JSON file (one JSON per image). Expected structure:
+// { "annotations": [ { "bbox": [...], "category_id": n, "segmentation": ... }, ... ],
+//   "categories": [ { "id": n, "name": "..." }, ... ]  (optional)
+// }
+bool MainWindow::loadCocoPerImageJson(const QString &jsonPath,
+                                      QVector<CocoAnnotation> &outAnns,
+                                      QHash<int, QString> &outCatMap) const
+{
+    outAnns.clear();
+    outCatMap.clear();
+
+    QFile f(jsonPath);
+    if (!f.open(QIODevice::ReadOnly)) return false;
+
+    QJsonParseError err{};
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &err);
+    f.close();
+
+    if (doc.isNull() || !doc.isObject()) return false;
+
+    const QJsonObject root = doc.object();
+
+    // categories (optional)
+    const QJsonArray categories = root.value("categories").toArray();
+    for (const QJsonValue &v : categories) {
+        const QJsonObject o = v.toObject();
+        const int id = o.value("id").toInt(-1);
+        const QString name = o.value("name").toString();
+        if (id >= 0 && !name.isEmpty()) outCatMap.insert(id, name);
+    }
+
+    const QJsonArray anns = root.value("annotations").toArray();
+    if (anns.isEmpty()) return false;
+
+    for (const QJsonValue &v : anns) {
+        const QJsonObject o = v.toObject();
+        const int catId = o.value("category_id").toInt(-1);
+        if (catId < 0) continue;
+
+        CocoAnnotation ann;
+        ann.categoryId = catId;
+        ann.categoryName = outCatMap.value(catId, QString("cat_%1").arg(catId));
+
+        const QJsonArray bbox = o.value("bbox").toArray();
+        if (bbox.size() == 4) {
+            const double x = bbox.at(0).toDouble();
+            const double y = bbox.at(1).toDouble();
+            const double w = bbox.at(2).toDouble();
+            const double h = bbox.at(3).toDouble();
+            ann.bbox = QRectF(x, y, w, h);
+        }
+
+        const QJsonValue segV = o.value("segmentation");
+
+        // polygons
+        if (segV.isArray()) {
+            const QJsonArray segA = segV.toArray();
+            if (!segA.isEmpty() && segA.at(0).isArray()) {
+                for (const QJsonValue &polyV : segA) {
+                    const QJsonArray polyA = polyV.toArray();
+                    QPolygonF poly;
+                    for (int i = 0; i + 1 < polyA.size(); i += 2) {
+                        poly << QPointF(polyA.at(i).toDouble(), polyA.at(i + 1).toDouble());
+                    }
+                    if (poly.size() >= 3) ann.polygons.append(poly);
+                }
+            } else {
+                QPolygonF poly;
+                for (int i = 0; i + 1 < segA.size(); i += 2) {
+                    poly << QPointF(segA.at(i).toDouble(), segA.at(i + 1).toDouble());
+                }
+                if (poly.size() >= 3) ann.polygons.append(poly);
+            }
+        }
+
+        // RLE object
+        if (segV.isObject()) {
+            const QJsonObject segO = segV.toObject();
+            const QJsonArray sizeA = segO.value("size").toArray();
+            const int h = sizeA.size() >= 1 ? sizeA.at(0).toInt(0) : 0;
+            const int w = sizeA.size() >= 2 ? sizeA.at(1).toInt(0) : 0;
+            const QJsonValue countsV = segO.value("counts");
+            if (countsV.isArray()) {
+                ann.rleMask = decodeCocoRleCountsArray(countsV.toArray(), h, w);
+            }
+        }
+
+        outAnns.append(ann);
+    }
+
+    return !outAnns.isEmpty();
+}
+
+QImage MainWindow::renderCocoForPath(const QImage &img,
+                                    const QString &imagePath,
+                                    const QString &cocoPathOrDir,
+                                    CocoCache &cache) const
+{
+    if (cocoPathOrDir.isEmpty()) return img;
+
+    const QFileInfo fi(cocoPathOrDir);
+    if (fi.exists() && fi.isFile()) {
+        // Standard single COCO instances JSON
+        if (!cache.loaded || cache.jsonPath != cocoPathOrDir) {
+            MainWindow *self = const_cast<MainWindow*>(this);
+            self->loadCocoJson(cocoPathOrDir, cache);
+        }
+        return cache.loaded ? renderCocoOn(img, imagePath, cache) : img;
+    }
+
+    if (!(fi.exists() && fi.isDir())) return img;
+
+    // Per-image JSON folder: try <completeBaseName>.json and <fileName>.json
+    const QFileInfo imgFi(imagePath);
+    const QString candidate1 = QDir(cocoPathOrDir).filePath(imgFi.completeBaseName() + ".json");
+    const QString candidate2 = QDir(cocoPathOrDir).filePath(imgFi.fileName() + ".json");
+
+    QString jsonFile;
+    if (QFileInfo::exists(candidate1)) jsonFile = candidate1;
+    else if (QFileInfo::exists(candidate2)) jsonFile = candidate2;
+    else return img;
+
+    QVector<CocoAnnotation> anns;
+    QHash<int, QString> cats;
+    if (!loadCocoPerImageJson(jsonFile, anns, cats)) return img;
+
+    QImage out = img.convertToFormat(QImage::Format_RGB32);
+    QPainter p(&out);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    for (const CocoAnnotation &ann : anns) {
+        const QColor c = cocoColorForId(ann.categoryId);
+
+        if (!ann.polygons.isEmpty()) {
+            QColor fill = c; fill.setAlpha(60);
+            p.setBrush(QBrush(fill));
+            p.setPen(QPen(c, 2));
+            for (const QPolygonF &poly : ann.polygons) p.drawPolygon(poly);
+            p.setBrush(Qt::NoBrush);
+        }
+
+        if (!ann.rleMask.isNull()) {
+            QImage m = ann.rleMask;
+            if (m.size() != out.size()) m = m.scaled(out.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+
+            QImage overlay(out.size(), QImage::Format_ARGB32_Premultiplied);
+            overlay.fill(Qt::transparent);
+            const QColor cFill(c.red(), c.green(), c.blue(), 80);
+
+            for (int y = 0; y < overlay.height(); ++y) {
+                const uchar *a = m.constScanLine(y);
+                QRgb *dst = reinterpret_cast<QRgb*>(overlay.scanLine(y));
+                for (int x = 0; x < overlay.width(); ++x) {
+                    if (a[x] > 0) dst[x] = qRgba(cFill.red(), cFill.green(), cFill.blue(), cFill.alpha());
+                }
+            }
+            p.drawImage(0, 0, overlay);
+        }
+
+        if (ann.bbox.isValid()) {
+            p.setPen(QPen(c, 3));
+            p.drawRect(ann.bbox);
+
+            const QString label = ann.categoryName.isEmpty() ? QString("cat_%1").arg(ann.categoryId) : ann.categoryName;
+            QFont font = p.font(); font.setBold(true); font.setPointSize(10);
+            p.setFont(font);
+
+            const int pad = 4;
+            QRect tr = p.fontMetrics().boundingRect(label);
+            QRect bg(int(ann.bbox.x()), int(ann.bbox.y()) - tr.height() - 2*pad,
+                     tr.width() + 2*pad, tr.height() + 2*pad);
+            if (bg.y() < 0) bg.moveTop(int(ann.bbox.y()) + 2);
+
+            QColor bgc = c; bgc.setAlpha(190);
+            p.fillRect(bg, bgc);
+            p.setPen(Qt::white);
+            p.drawText(bg.adjusted(pad, pad, -pad, -pad), Qt::AlignLeft | Qt::AlignVCenter, label);
+        }
+    }
+
+    p.end();
+    return out;
+}
+
+void MainWindow::toggleCocoAnnotations()
+{
+    showCocoAnnotations = !showCocoAnnotations;
+
+    if (toggleCocoButton) {
+        if (showCocoAnnotations) {
+            toggleCocoButton->setStyleSheet(
+                "QPushButton { background-color: #1E90FF; color: white; border-radius: 6px; font-size: 14px; }"
+                "QPushButton:hover { background-color: #187bcd; }");
+        } else {
+            styleButton(toggleCocoButton);
+            toggleCocoButton->setFixedHeight(40);
+        }
+    }
+
+    if (compareMode) updateCompareView();
+    else updateImage();
+
+    logActivity(QString("COCO annotations %1").arg(showCocoAnnotations ? "ON" : "OFF"));
+}
+
+
+void MainWindow::toggleLabelMeAnnotations()
+{
+    showLabelMeAnnotations = !showLabelMeAnnotations;
+
+    if (toggleLabelMeButton) {
+        if (showLabelMeAnnotations) {
+            toggleLabelMeButton->setStyleSheet(
+                "QPushButton { background-color: #2E8B57; color: white; font-weight: bold; border-radius: 6px; }"
+                "QPushButton:hover { background-color: #3CB371; }"
+            );
+        } else {
+            styleButton(toggleLabelMeButton);
+        }
+    }
+
+    updateImage();
+}
+
+void MainWindow::on_loadLabelMeDirButton_clicked()
+{
+    const QString dir = QFileDialog::getExistingDirectory(this, "Select LabelMe JSON folder");
+    if (dir.isEmpty()) return;
+
+    labelMeJsonDirPath = dir;
+
+    logStream << "[LabelMe] Labels folder set: " << dir << "\n";
+    logStream.flush();
+
+    updateImage();
+}
+
+QVector<LabelMeShape> MainWindow::loadLabelMeForImage(const QString &imagePath, const QString &labelMeDir) const
+{
+    QVector<LabelMeShape> out;
+    if (labelMeDir.isEmpty()) return out;
+
+    const QString base = QFileInfo(imagePath).completeBaseName();
+    QString jsonPath = QDir(labelMeDir).filePath(base + ".json");
+    if (!QFileInfo::exists(jsonPath)) {
+        // also try <filename>.json
+        jsonPath = QDir(labelMeDir).filePath(QFileInfo(imagePath).fileName() + ".json");
+        if (!QFileInfo::exists(jsonPath)) return out;
+    }
+
+    QFile f(jsonPath);
+    if (!f.open(QIODevice::ReadOnly)) return out;
+    const QByteArray data = f.readAll();
+    f.close();
+
+    QJsonParseError err{};
+    const QJsonDocument doc = QJsonDocument::fromJson(data, &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) return out;
+
+    const QJsonObject root = doc.object();
+    const QJsonArray shapes = root.value("shapes").toArray();
+
+    for (const QJsonValue &sv : shapes) {
+        if (!sv.isObject()) continue;
+        const QJsonObject s = sv.toObject();
+        const QString label = s.value("label").toString();
+        const QString shapeType = s.value("shape_type").toString("polygon");
+        const QJsonArray pts = s.value("points").toArray();
+        if (pts.size() < 2) continue;
+
+        QPolygonF poly;
+
+        if (shapeType == "rectangle" && pts.size() >= 2) {
+            const QJsonArray p0 = pts.at(0).toArray();
+            const QJsonArray p1 = pts.at(1).toArray();
+            if (p0.size() < 2 || p1.size() < 2) continue;
+
+            const double x0 = p0.at(0).toDouble();
+            const double y0 = p0.at(1).toDouble();
+            const double x1 = p1.at(0).toDouble();
+            const double y1 = p1.at(1).toDouble();
+
+            const double xmin = std::min(x0, x1);
+            const double xmax = std::max(x0, x1);
+            const double ymin = std::min(y0, y1);
+            const double ymax = std::max(y0, y1);
+
+            poly << QPointF(xmin, ymin)
+                 << QPointF(xmax, ymin)
+                 << QPointF(xmax, ymax)
+                 << QPointF(xmin, ymax);
+        } else {
+            for (const QJsonValue &pv : pts) {
+                const QJsonArray p = pv.toArray();
+                if (p.size() < 2) continue;
+                poly << QPointF(p.at(0).toDouble(), p.at(1).toDouble());
+            }
+            if (poly.size() < 3) continue;
+        }
+
+        LabelMeShape sh;
+        sh.label = label;
+        sh.polygon = poly;
+        out.push_back(sh);
+    }
+
+    return out;
+}
+
+QImage MainWindow::renderLabelMeOn(const QImage &img, const QString &imagePath, const QString &labelMeDir) const
+{
+    if (!showLabelMeAnnotations) return img;
+
+    const QVector<LabelMeShape> shapes = loadLabelMeForImage(imagePath, labelMeDir);
+    if (shapes.isEmpty()) return img;
+
+    QImage out = img.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    QPainter painter(&out);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QPen pen(Qt::yellow);
+    pen.setWidth(2);
+    painter.setPen(pen);
+    painter.setBrush(QColor(255, 255, 0, 60));
+
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPointSize(std::max(9, font.pointSize()));
+    painter.setFont(font);
+
+    for (const LabelMeShape &sh : shapes) {
+        painter.drawPolygon(sh.polygon);
+
+        if (!sh.label.isEmpty() && !sh.polygon.isEmpty()) {
+            const QPointF anchor = sh.polygon.first();
+            const QRectF bg(anchor.x(), anchor.y() - 18, 220, 18);
+
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0, 0, 0, 140));
+            painter.drawRect(bg);
+
+            painter.setPen(Qt::white);
+            painter.drawText(bg.adjusted(4, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft, sh.label);
+
+            painter.setPen(pen);
+            painter.setBrush(QColor(255, 255, 0, 60));
+        }
+    }
+
+    painter.end();
+    return out;
+}
+
+
+void MainWindow::on_loadCocoJsonButton_clicked()
+{
+    const QString file = QFileDialog::getOpenFileName(this, "Select COCO JSON folder (one JSON per image)", "", "JSON (*.json);;All (*)");
+    if (file.isEmpty()) return;
+
+    cocoJsonPath = file;
+    if (loadCocoJson(file, cocoCacheSingle)) {
+        logActivity("Loaded COCO JSON: " + file);
+        if (compareMode) updateCompareView();
+        else updateImage();
+    }
+}
+
+// ------------------------------------------------------------
+// Compare mode
+// ------------------------------------------------------------
+static bool isImageExtAllowed(const QString &ext)
+{
+    static const QSet<QString> exts = {".jpg",".jpeg",".png",".JPG",".JPEG",".PNG"};
+    return exts.contains(ext);
+}
+
+static QStringList listImagesInDir(const QString &dirPath)
+{
+    QDir d(dirPath);
+    const QFileInfoList infos = d.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    QStringList out;
+    out.reserve(infos.size());
+    for (const QFileInfo &fi : infos) {
+        if (isImageExtAllowed(fi.suffix().isEmpty() ? QString() : ("." + fi.suffix()))) {
+            out << fi.fileName();
+        } else {
+            // suffix() returns without dot; handle case-insensitive by checking completeSuffix
+            const QString extDot = "." + fi.completeSuffix();
+            if (isImageExtAllowed(extDot)) out << fi.fileName();
+        }
+    }
+    return out;
+}
+
+void MainWindow::startCompareMode()
+{
+    const QString leftImg = QFileDialog::getExistingDirectory(this, "Select LEFT image directory");
+    if (leftImg.isEmpty()) return;
+    const QString leftLbl = QFileDialog::getExistingDirectory(this, "Select LEFT labels directory (optional - Cancel to use image dir)");
+    const QString leftCoco = QFileDialog::getOpenFileName(this, "Select LEFT COCO annotations JSON (optional - Cancel to skip)", leftImg, "JSON (*.json);;All (*)");
+    const QString leftLabelMe = QFileDialog::getExistingDirectory(this, "Select LEFT LabelMe JSON folder (optional - Cancel to skip)", leftImg);
+
+    const QString rightImg = QFileDialog::getExistingDirectory(this, "Select RIGHT image directory");
+    if (rightImg.isEmpty()) return;
+    const QString rightLbl = QFileDialog::getExistingDirectory(this, "Select RIGHT labels directory (optional - Cancel to use image dir)");
+    const QString rightCoco = QFileDialog::getOpenFileName(this, "Select RIGHT COCO annotations JSON (optional - Cancel to skip)", rightImg, "JSON (*.json);;All (*)");
+    const QString rightLabelMe = QFileDialog::getExistingDirectory(this, "Select RIGHT LabelMe JSON folder (optional - Cancel to skip)", rightImg);
+
+    compareLeftImageDir = leftImg;
+    compareRightImageDir = rightImg;
+    compareLeftLabelsDir = leftLbl.isEmpty() ? leftImg : leftLbl;
+    compareRightLabelsDir = rightLbl.isEmpty() ? rightImg : rightLbl;
+
+    compareLeftCocoJsonPath = leftCoco;
+    compareRightCocoJsonPath = rightCoco;
+    compareLeftLabelMeJsonDir = leftLabelMe;
+    compareRightLabelMeJsonDir = rightLabelMe;
+    cocoCacheLeft.loaded = false;
+    cocoCacheRight.loaded = false;
+
+    const QStringList leftFiles = listImagesInDir(compareLeftImageDir);
+    const QStringList rightFiles = listImagesInDir(compareRightImageDir);
+    QSet<QString> leftSet;
+    leftSet.reserve(leftFiles.size());
+    for (const QString &f : leftFiles) leftSet.insert(f);
+
+    compareImageList.clear();
+    for (const QString &f : rightFiles) {
+        if (leftSet.contains(f)) compareImageList << f;
+    }
+    std::sort(compareImageList.begin(), compareImageList.end(), [](const QString &a, const QString &b){
+        return a.toLower() < b.toLower();
+    });
+
+    if (compareImageList.isEmpty()) {
+        QMessageBox::information(this, "Compare", "No matching image filenames found between the two directories.");
+        return;
+    }
+
+    compareMode = true;
+    compareIndex = 0;
+
+    // Disable tagging/category selection in compare mode
+    categoryTabs->setEnabled(false);
+    configureTaggingButton->setEnabled(false);
+    addButton->setEnabled(false);
+    removeButton->setEnabled(false);
+    saveButton->setEnabled(false);
+    clearButton->setEnabled(false);
+    deleteButton->setEnabled(false);
+    moveButton->setEnabled(false);
+    copyButton->setEnabled(false);
+    toggleYoloButton->setEnabled(true);
+    loadNamesButton->setEnabled(true);
+    loadLabelsButton->setEnabled(false);
+    loadCocoButton->setEnabled(false);
+
+    imageLabel->setVisible(false);
+    infoLabel->setVisible(false);
+    dateTimeLabel->setVisible(false);
+    compareWidget->setVisible(true);
+
+    imageSlider->blockSignals(true);
+    imageSlider->setRange(0, compareImageList.size() - 1);
+    imageSlider->setValue(0);
+    imageSlider->blockSignals(false);
+
+    updateCompareView();
+    logActivity("Entered compare mode. LEFT=" + compareLeftImageDir + " RIGHT=" + compareRightImageDir);
+}
+
+void MainWindow::exitCompareMode()
+{
+    if (!compareMode) return;
+    compareMode = false;
+    compareImageList.clear();
+
+    categoryTabs->setEnabled(true);
+    configureTaggingButton->setEnabled(true);
+    addButton->setEnabled(true);
+    removeButton->setEnabled(true);
+    saveButton->setEnabled(true);
+    clearButton->setEnabled(true);
+    deleteButton->setEnabled(true);
+    moveButton->setEnabled(true);
+    copyButton->setEnabled(true);
+
+    loadLabelsButton->setEnabled(true);
+    loadCocoButton->setEnabled(true);
+
+    imageLabel->setVisible(true);
+    infoLabel->setVisible(true);
+    dateTimeLabel->setVisible(true);
+    compareWidget->setVisible(false);
+
+    imageSlider->blockSignals(true);
+    imageSlider->setRange(0, std::max(0, imageList.size() - 1));
+    imageSlider->setValue(currentImageIndex);
+    imageSlider->blockSignals(false);
+
+    updateImage();
+    logActivity("Exited compare mode.");
+}
+
+void MainWindow::updateCompareView()
+{
+    if (!compareMode || compareImageList.isEmpty()) return;
+    compareIndex = std::clamp(compareIndex, 0, compareImageList.size() - 1);
+    const QString fileName = compareImageList.at(compareIndex);
+
+    const QString leftPath = QDir(compareLeftImageDir).filePath(fileName);
+    const QString rightPath = QDir(compareRightImageDir).filePath(fileName);
+
+    QImage leftImg(leftPath);
+    QImage rightImg(rightPath);
+    if (leftImg.isNull() || rightImg.isNull()) return;
+
+    auto labelStatus = [](const QString &imgPath, const QString &labelsDir) -> QString {
+        const QString base = QFileInfo(imgPath).completeBaseName();
+        const QString txtPath = QDir(labelsDir).filePath(base + ".txt");
+        return QFileInfo::exists(txtPath) ? "labels: FOUND" : "labels: missing";
+    };
+
+    if (showYoloBoundingBoxes) {
+        leftImg = renderBoundingBoxesOn(leftImg, leftPath, compareLeftLabelsDir);
+        rightImg = renderBoundingBoxesOn(rightImg, rightPath, compareRightLabelsDir);
+    }
+
+    if (showCocoAnnotations) {
+        if (!compareLeftCocoJsonPath.isEmpty()) leftImg = renderCocoForPath(leftImg, leftPath, compareLeftCocoJsonPath, cocoCacheLeft);
+        if (!compareRightCocoJsonPath.isEmpty()) rightImg = renderCocoForPath(rightImg, rightPath, compareRightCocoJsonPath, cocoCacheRight);
+    }
+
+    if (showLabelMeAnnotations) {
+        const QString leftLmDir = compareLeftLabelMeJsonDir.isEmpty() ? compareLeftImageDir : compareLeftLabelMeJsonDir;
+        const QString rightLmDir = compareRightLabelMeJsonDir.isEmpty() ? compareRightImageDir : compareRightLabelMeJsonDir;
+        leftImg = renderLabelMeOn(leftImg, leftPath, leftLmDir);
+        rightImg = renderLabelMeOn(rightImg, rightPath, rightLmDir);
+    }
+
+    compareLeftImageLabel->setPixmap(QPixmap::fromImage(leftImg).scaled(compareLeftImageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    compareRightImageLabel->setPixmap(QPixmap::fromImage(rightImg).scaled(compareRightImageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    compareLeftInfoLabel->setText(QString("LEFT: %1<br>%2 x %3<br>%4<br>%5")
+        .arg(QFileInfo(compareLeftImageDir).fileName())
+        .arg(leftImg.width())
+        .arg(leftImg.height())
+        .arg(fileName)
+        .arg(labelStatus(leftPath, compareLeftLabelsDir) + QString("<br>COCO: ") + (cocoCacheLeft.loaded ? "LOADED" : "none")));
+    compareRightInfoLabel->setText(QString("RIGHT: %1<br>%2 x %3<br>%4<br>%5")
+        .arg(QFileInfo(compareRightImageDir).fileName())
+        .arg(rightImg.width())
+        .arg(rightImg.height())
+        .arg(fileName)
+        .arg(labelStatus(rightPath, compareRightLabelsDir) + QString("<br>COCO: ") + (cocoCacheRight.loaded ? "LOADED" : "none")));
+
+    indexLabel->setText(QString::number(compareIndex + 1) + " / " + QString::number(compareImageList.size()));
 }
 
 // ------------------------------------------------------------

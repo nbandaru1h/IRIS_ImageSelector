@@ -1,4 +1,4 @@
 cmake_minimum_required(VERSION 3.16)
-project(AI_ImageSuite_V1.0 LANGUAGES CXX)
+project(AI_ImageSuite_V3.0 LANGUAGES CXX)
 add_subdirectory(src)
 

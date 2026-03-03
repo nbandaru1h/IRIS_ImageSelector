@@ -1,6 +1,7 @@
 file(REMOVE_RECURSE
   "AI_ImageSuite_autogen/include/ui_mainwindow.h"
   "AI_ImageSuite_autogen/mocs_compilation.cpp"
+  "AI_ImageSuite_autogen/timestamp"
   "CMakeFiles/AI_ImageSuite_autogen"
 )
 

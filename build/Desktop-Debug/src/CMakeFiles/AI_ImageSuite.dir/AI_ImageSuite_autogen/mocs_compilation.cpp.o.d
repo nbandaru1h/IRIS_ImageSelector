@@ -1,7 +1,7 @@
 src/CMakeFiles/AI_ImageSuite.dir/AI_ImageSuite_autogen/mocs_compilation.cpp.o: \
- /home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/mocs_compilation.cpp \
+ /home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/mocs_compilation.cpp \
  /usr/include/stdc-predef.h \
- /home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/EWIEGA46WW/moc_mainwindow.cpp \
+ /home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/EWIEGA46WW/moc_mainwindow.cpp \
  /usr/include/c++/11/memory /usr/include/c++/11/bits/stl_algobase.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h \
@@ -117,7 +117,7 @@ src/CMakeFiles/AI_ImageSuite.dir/AI_ImageSuite_autogen/mocs_compilation.cpp.o: \
  /usr/include/c++/11/backward/auto_ptr.h \
  /usr/include/c++/11/pstl/glue_memory_defs.h \
  /usr/include/c++/11/pstl/execution_defs.h \
- /home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/EWIEGA46WW/../../../../../src/mainwindow.h \
+ /home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/EWIEGA46WW/../../../../../src/mainwindow.h \
  /usr/include/x86_64-linux-gnu/qt5/QtWidgets/QMainWindow \
  /usr/include/x86_64-linux-gnu/qt5/QtWidgets/qmainwindow.h \
  /usr/include/x86_64-linux-gnu/qt5/QtWidgets/qtwidgetsglobal.h \
@@ -327,4 +327,23 @@ src/CMakeFiles/AI_ImageSuite.dir/AI_ImageSuite_autogen/mocs_compilation.cpp.o: \
  /usr/include/x86_64-linux-gnu/qt5/QtCore/QTextStream \
  /usr/include/x86_64-linux-gnu/qt5/QtCore/qtextstream.h \
  /usr/include/x86_64-linux-gnu/qt5/QtCore/QVector \
- /usr/include/x86_64-linux-gnu/qt5/QtCore/qvector.h
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qvector.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/QHash \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qhash.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtGui/QPolygonF \
+ /usr/include/x86_64-linux-gnu/qt5/QtGui/qpolygon.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/QJsonArray \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qjsonarray.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qjsonvalue.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qcborvalue.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qdatetime.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qcborcommon.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qdebug.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qtextstream.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qcontiguouscache.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qurl.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/quuid.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/QJsonDocument \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qjsondocument.h \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/QJsonObject \
+ /usr/include/x86_64-linux-gnu/qt5/QtCore/qjsonobject.h

@@ -1,23 +1,26 @@
 {
-	"BUILD_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/AI_ImageSuite_autogen",
-	"CMAKE_BINARY_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug",
-	"CMAKE_CURRENT_BINARY_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src",
-	"CMAKE_CURRENT_SOURCE_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/src",
-	"CMAKE_SOURCE_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0",
-	"INCLUDE_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/include",
+	"BUILD_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/AI_ImageSuite_autogen",
+	"CMAKE_BINARY_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug",
+	"CMAKE_CURRENT_BINARY_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/src",
+	"CMAKE_SOURCE_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0",
+	"CROSS_CONFIG" : false,
+	"GENERATOR" : "Unix Makefiles",
+	"INCLUDE_DIR" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/AI_ImageSuite_autogen/include",
 	"INPUTS" : 
 	[
-		"/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/assets/harsco-logo.jpg",
-		"/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/assets/AI_ImageSelector.png"
+		"/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/assets/harsco-logo.jpg",
+		"/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/assets/AI_ImageSelector.png"
 	],
-	"LOCK_FILE" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/CMakeFiles/AI_ImageSuite_autogen.dir/AutoRcc_resources_EWIEGA46WW_Lock.lock",
+	"LOCK_FILE" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/CMakeFiles/AI_ImageSuite_autogen.dir/AutoRcc_resources_EWIEGA46WW_Lock.lock",
 	"MULTI_CONFIG" : false,
 	"OPTIONS" : [ "-name", "resources" ],
 	"OUTPUT_CHECKSUM" : "EWIEGA46WW",
 	"OUTPUT_NAME" : "qrc_resources.cpp",
 	"RCC_EXECUTABLE" : "/usr/lib/qt5/bin/rcc",
 	"RCC_LIST_OPTIONS" : [ "--list" ],
-	"SETTINGS_FILE" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/build/Desktop-Debug/src/CMakeFiles/AI_ImageSuite_autogen.dir/AutoRcc_resources_EWIEGA46WW_Used.txt",
-	"SOURCE" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V1.0/src/resources.qrc",
+	"SETTINGS_FILE" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/build/Desktop-Debug/src/CMakeFiles/AI_ImageSuite_autogen.dir/AutoRcc_resources_EWIEGA46WW_Used.txt",
+	"SOURCE" : "/home/nbandaru1/ai/ann/projects/applications/AI_ImageSuite/AI_ImageSuite_V3.0/src/resources.qrc",
+	"USE_BETTER_GRAPH" : false,
 	"VERBOSITY" : 0
 }

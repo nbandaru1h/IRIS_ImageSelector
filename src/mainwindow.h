@@ -13,15 +13,54 @@
 #include <QTabWidget>
 #include <QTextStream>
 #include <QVector>
+#include <QHash>
+#include <QPolygonF>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 class QKeyEvent;
 class QResizeEvent;
+class QAction;
 
 struct BoundingBox {
     QRect rect;
     QString label;
     float confidence = 0.0f;
 };
+
+// YOLO parsed annotation (pixel-space)
+struct Annotation {
+    QRect boundingBox;
+    int classId = -1;
+    QString className;
+    float confidence = 0.0f; // optional if present in label file
+};
+
+// COCO parsed annotation (pixel-space)
+struct CocoAnnotation {
+    QRectF bbox;                 // [x,y,w,h] in pixels
+    int categoryId = -1;
+    QString categoryName;
+    QVector<QPolygonF> polygons; // segmentation polygons (if available)
+    QImage rleMask;              // alpha mask for RLE segmentation (optional)
+};
+
+// Parsed COCO dataset cache (per JSON)
+struct CocoCache {
+    bool loaded = false;
+    QString jsonPath;
+    QHash<QString, int> fileNameToImageId;             // file_name -> image_id
+    QHash<int, QVector<CocoAnnotation>> imageIdToAnns; // image_id -> annotations
+    QHash<int, QString> categoryIdToName;              // category_id -> name
+};
+
+// LabelMe parsed shape (pixel-space)
+struct LabelMeShape {
+    QString label;
+    QPolygonF polygon;
+};
+
 
 class MainWindow : public QMainWindow
 {
@@ -57,6 +96,15 @@ private slots:
     // YOLO
     void toggleYoloBoundingBoxes();
     void on_loadNamesFileButton_clicked();
+    void on_loadLabelsDirButton_clicked();
+
+    // COCO
+    void toggleCocoAnnotations();
+    void on_loadCocoJsonButton_clicked();
+
+    // Compare
+    void startCompareMode();
+    void exitCompareMode();
 
     // File menu
     void openImageDirectory();
@@ -72,13 +120,42 @@ private:
     void loadImagesFromDirectory();
     bool loadImagesFromDirectoryPath(const QString &dirPath, bool logIt = true);
     void updateImage();
+    void updateCompareView();
     void logActivity(const QString &message);
 
     // YOLO helpers
     QString getClassName(int classId) const;
     void loadClassNames(const QString &namesFilePath);
-    void loadYOLOAnnotations(const QString &imagePath);
-    QImage renderBoundingBoxesOn(const QImage &img) const;
+    QImage renderBoundingBoxesOn(const QImage &img,
+                                 const QString &imagePath,
+                                 const QString &labelsDir) const;
+
+    QString effectiveLabelsDirForSingleView() const;
+
+
+    // COCO helpers
+    QString imageFileNameKey(const QString &imagePath) const;
+    bool loadCocoJson(const QString &jsonPath, CocoCache &cache);
+    QImage renderCocoOn(const QImage &img,
+                        const QString &imagePath,
+                        const CocoCache &cache) const;
+
+    // LabelMe (per-image JSON) annotations (polygon/rectangle)
+    void toggleLabelMeAnnotations();
+    void on_loadLabelMeDirButton_clicked();
+    QVector<LabelMeShape> loadLabelMeForImage(const QString &imagePath, const QString &labelMeDir) const;
+    QImage renderLabelMeOn(const QImage &img, const QString &imagePath, const QString &labelMeDir) const;
+
+    // Per-image COCO JSON mode: one JSON per image
+    bool loadCocoPerImageJson(const QString &jsonPath,
+                              QVector<CocoAnnotation> &outAnns,
+                              QHash<int, QString> &outCatMap) const;
+
+    // Render COCO annotations from either a per-image JSON folder OR a single COCO instances JSON file.
+    QImage renderCocoForPath(const QImage &img,
+                             const QString &imagePath,
+                             const QString &cocoPathOrDir,
+                             CocoCache &cache) const;
 
     // Tagging helpers
     void ensureDefaultCategory();
@@ -119,15 +196,33 @@ private:
     // YOLO
     bool showYoloBoundingBoxes = false;
     QImage currentImage;
-    struct Annotation {
-        QRect boundingBox;
-        int classId = -1;
-        QString className;
-        float confidence = 0.0f;
-    };
-    QVector<Annotation> currentAnnotations;
+    QString yoloLabelsDirPath; // optional separate labels dir for single-view
     QStringList classNames;
     QMap<int, QColor> classColors;
+
+    // COCO
+    bool showCocoAnnotations = false;
+    QString cocoJsonPath; // single-view COCO path: folder of per-image JSONs OR a single COCO instances JSON
+    CocoCache cocoCacheSingle;
+
+    // LabelMe
+    bool showLabelMeAnnotations = false;
+    QString labelMeJsonDirPath; // single-view: folder containing per-image LabelMe JSONs
+
+    // Compare mode
+    bool compareMode = false;
+    QString compareLeftImageDir;
+    QString compareRightImageDir;
+    QString compareLeftLabelsDir;
+    QString compareRightLabelsDir;
+    QString compareLeftCocoJsonPath; // folder or file
+    QString compareRightCocoJsonPath; // folder or file
+    QString compareLeftLabelMeJsonDir;  // folder of per-image LabelMe JSONs (optional)
+    QString compareRightLabelMeJsonDir; // folder of per-image LabelMe JSONs (optional)
+    CocoCache cocoCacheLeft;
+    CocoCache cocoCacheRight;
+    QStringList compareImageList; // filenames that exist in both dirs
+    int compareIndex = 0;
 
     // Tagging
     QMap<int, QString> keyToCategory;            // Qt::Key_* -> category
@@ -142,6 +237,16 @@ private:
     QLabel *taggingHintLabel = nullptr;
     QLabel *lastSavedLabel = nullptr;
     QLabel *indexLabel = nullptr;
+
+    // Compare UI
+    QWidget *compareWidget = nullptr;
+    QLabel *compareLeftImageLabel = nullptr;
+    QLabel *compareRightImageLabel = nullptr;
+    QLabel *compareLeftInfoLabel = nullptr;
+    QLabel *compareRightInfoLabel = nullptr;
+    QAction *compareAction = nullptr;
+    QAction *exitCompareAction = nullptr;
+    QAction *loadLabelsDirAction = nullptr;
     QLabel *dirNameLabel = nullptr;
     QLabel *dateTimeLabel = nullptr;
 
@@ -166,6 +271,11 @@ private:
 
     QPushButton *toggleYoloButton = nullptr;
     QPushButton *loadNamesButton = nullptr;
+    QPushButton *loadLabelsButton = nullptr;
+    QPushButton *toggleCocoButton = nullptr;
+    QPushButton *loadCocoButton = nullptr;
+    QPushButton *toggleLabelMeButton = nullptr;
+    QPushButton *loadLabelMeButton = nullptr;
 
     // Logging
     QFile logFile;
